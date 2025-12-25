@@ -1439,17 +1439,17 @@ def distributed_data_generator(filename_pattern: str, num_tokens: int, max_seq_l
 
 @dataclass
 class Hyperparameters:
-    # data
-    train_files: str = "data/fineweb10B/fineweb_train_*.bin" # input .bin to train on
+    # data - MODIFIED for comparison: use 4 shards
+    train_files: str = "data/fineweb10B/fineweb_train_00000[1234].bin" # input .bin to train on
     val_files: str = "data/fineweb10B/fineweb_val_*.bin" # input .bin to eval validation loss on
     val_tokens: int = 10485760 # how many tokens of validation data? it's important to keep this fixed for consistent comparisons
-    # batch sizes
+    # batch sizes - KEEP ORIGINAL for compatibility
     train_bs_schedule: tuple = (8 * 2048 * 8, 16 * 2048 * 8, 24 * 2048 * 8)
     train_bs_extension: int = 24 * 2048 * 8
     train_max_seq_len: int = 128 * 16
     val_batch_size: int = 4 * 64 * 1024 * 1  # Reduced for 1 GPU / eager mode
-    # optimization
-    num_scheduled_iterations: int = 100  # number of steps to complete lr and ws schedule
+    # optimization - MODIFIED for comparison: 1000 steps
+    num_scheduled_iterations: int = 1000  # number of steps to complete lr and ws schedule
     num_extension_iterations: int = 0  # number of steps to continue training at final lr and ws
     num_iterations: int = num_scheduled_iterations + num_extension_iterations
     cooldown_frac: float = 0.55  # fraction of num_scheduled_iterations spent cooling down the learning rate
@@ -1457,9 +1457,9 @@ class Hyperparameters:
     split_embed_frac: float = 2/3  # fraction of training when embeddings split from lm_head
     # evaluation and logging
     run_id: str = f"{uuid.uuid4()}"
-    val_loss_every: int = 250  # every how many steps to evaluate val loss? 0 for only at the end
+    val_loss_every: int = 0  # MODIFIED for comparison: only evaluate at the end
     save_checkpoint: bool = False
-    # attention masking
+    # attention masking - KEEP ORIGINAL for compatibility
     block_size: int = 128
     ws_schedule: tuple = (3, 7, 11)
     ws_final: int = 13 # increase final validation ws, used for YaRN extension and short window size @classiclarryd
@@ -1795,6 +1795,23 @@ for step in range(train_steps + 1):
             log = dict(step=step, code=code, model=model.state_dict(), optimizers=[opt.state_dict() for opt in optimizers])
             os.makedirs(f"logs/{run_id}", exist_ok=True)
             torch.save(log, f"logs/{run_id}/state_step{step:06d}.pt")
+
+        # ADDED for comparison: Save results to JSONL
+        if master_process:
+            result = {
+                'name': 'modded_nanogpt_baseline',
+                'architecture': 'modded_nanogpt_11x768',
+                'optimizer': 'Muon+DistAdam',
+                'use_fp8': True,
+                'steps': step,
+                'batch_size': 32,
+                'val_loss': float(val_loss),
+                'training_time_ms': training_time_ms,
+            }
+            with open('comparison_results.jsonl', 'a') as f:
+                f.write(json.dumps(result) + '\n')
+            print0(f"Results saved to comparison_results.jsonl", console=True)
+
         # the last step only has the validation loop, so break to avoid training
         break
 

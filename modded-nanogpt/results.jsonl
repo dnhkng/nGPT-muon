@@ -1,0 +1,1 @@
+{"alpha": 0.15, "logit_scale": 10.0, "n_layer": 6, "n_embd": 256, "lr": 0.001, "steps": 100, "batch_size": 16, "final_train_loss": 7.783182144165039, "val_loss": 7.712504267692566, "train_loss_reduction": 29.16562152880423, "time_seconds": 5.990658521652222, "tokens_per_sec": 34186.55883318755}
